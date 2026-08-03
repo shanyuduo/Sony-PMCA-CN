@@ -15,7 +15,7 @@
 | `pmca-gui-cn-win.exe` | 图形界面程序（完整汉化） | Windows 64 位 |
 | `pmca-console-cn-win.exe` | 命令行程序（完整汉化） | Windows 64 位 |
 
-macOS 版本需在 macOS 环境下自行编译，详见下方[编译说明](#从源码编译)。
+macOS 暂不提供预编译版本，需在 macOS 环境下从源码运行或自行编译，详见下方[编译说明](#从源码编译)。
 
 ## 安装
 
@@ -27,7 +27,7 @@ macOS 版本需在 macOS 环境下自行编译，详见下方[编译说明](#从
 
 ### macOS
 
-同样提供 macOS 版本，但测试不如 Windows 版充分。USB 驱动可能需要额外调试。若要以海量存储模式与相机通信，需安装索尼官方的 [Camera Driver](https://support.d-imaging.sony.co.jp/mac/driver/11/ja/)。请确保关闭所有可能访问 USB 驱动的应用程序，包括 Photos、Dropbox 和 Google Drive。
+本仓库暂不提供 macOS 预编译版本。可在 macOS 环境下从源码运行，USB 驱动可能需要额外调试。若要以海量存储模式与相机通信，需安装索尼官方的 [Camera Driver](https://support.d-imaging.sony.co.jp/mac/driver/11/ja/)。请确保关闭所有可能访问 USB 驱动的应用程序，包括 Photos、Dropbox 和 Google Drive。
 
 ### Linux
 
@@ -116,7 +116,7 @@ python -m PyInstaller pmca-gui.spec --noconfirm
 
 编译产物位于 `dist/` 目录下：
 - Windows：`pmca-console-cn-win.exe`、`pmca-gui-cn-win.exe`
-- macOS：`pmca-console-cn-osx`、`pmca-gui-cn-osx.dmg`
+- macOS：`pmca-console-cn-osx`、`pmca-gui-cn-osx.dmg`（需在 macOS 环境下自行编译，本仓库不提供预编译版本）
 
 ### macOS 编译说明
 
