@@ -21,6 +21,9 @@ output += '-' + version + suffix.get(sys.platform, '')
 a = Analysis([input], excludes=excludes, datas=[('certs/*', 'certs')])
 a.datas = [d for d in a.datas if not (d[0].startswith('certifi') and not d[0].endswith('cacert.pem'))]
 a.datas += Tree('updatershell/fdat', 'updatershell/fdat')
+# Bundle libusb-1.0.dll for Windows (pyusb backend)
+if sys.platform == 'win32':
+ a.binaries += [('libusb-1.0.dll', 'libusb-1.0.dll', 'BINARY')]
 
 # Generate executable
 pyz = PYZ(a.pure, a.zipped_data)
