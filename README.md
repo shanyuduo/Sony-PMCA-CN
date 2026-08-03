@@ -8,7 +8,7 @@
 
 ## 下载
 
-前往 [Releases 页面](https://github.com/Glimmer114514/Sony-PMCA-CN/releases/latest) 下载最新版本：
+前往 [Releases 页面](https://github.com/shanyuduo/Sony-PMCA-CN/releases/latest) 下载最新版本：
 
 | 文件 | 说明 | 平台 |
 |------|------|------|
@@ -101,7 +101,7 @@ pip install -r requirements.txt  # 安装依赖
 
 ```bash
 # 克隆仓库
-git clone https://github.com/Glimmer114514/Sony-PMCA-CN.git
+git clone https://github.com/shanyuduo/Sony-PMCA-CN.git
 cd Sony-PMCA-CN
 
 # 安装依赖
