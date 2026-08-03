@@ -1,0 +1,369 @@
+#!/usr/bin/env python3
+"""A simple gui interface"""
+import sys
+import traceback
+import webbrowser
+
+import config
+from pmca.commands.usb import *
+from pmca.platform.backend.senser import *
+from pmca.platform.backend.usb import *
+from pmca.platform.tweaks import *
+from pmca.ui import *
+
+if getattr(sys, 'frozen', False):
+ from frozenversion import version
+else:
+ version = None
+
+class PrintRedirector(object):
+ """Redirect writes to a function"""
+ def __init__(self, func, parent=None):
+  self.func = func
+  self.parent = parent
+ def write(self, str):
+  if self.parent:
+   self.parent.write(str)
+  self.func(str)
+ def flush(self):
+  self.parent.flush()
+
+
+class AppLoadTask(BackgroundTask):
+ def doBefore(self):
+  self.ui.setAppList([])
+  self.ui.appLoadButton.config(state=DISABLED)
+
+ def do(self, arg):
+  try:
+   print('')
+   return list(listApps().values())
+  except Exception:
+   traceback.print_exc()
+
+ def doAfter(self, result):
+  if result:
+   self.ui.setAppList(result)
+  self.ui.appLoadButton.config(state=NORMAL)
+
+
+class InfoTask(BackgroundTask):
+ """Task to run infoCommand()"""
+ def doBefore(self):
+  self.ui.infoButton.config(state=DISABLED)
+
+ def do(self, arg):
+  try:
+   print('')
+   infoCommand()
+  except Exception:
+   traceback.print_exc()
+
+ def doAfter(self, result):
+  self.ui.infoButton.config(state=NORMAL)
+
+
+class InstallTask(BackgroundTask):
+ """Task to run installCommand()"""
+ def doBefore(self):
+  self.ui.installButton.config(state=DISABLED)
+  return self.ui.getMode(), self.ui.getSelectedApk(), self.ui.getSelectedApp()
+
+ def do(self, args):
+  (mode, apkFilename, app) = args
+  try:
+   print('')
+   if mode == self.ui.MODE_APP and app:
+    installCommand(appPackage=app.package)
+   elif mode == self.ui.MODE_APK and apkFilename:
+    with open(apkFilename, 'rb') as f:
+     installCommand(apkFile=f)
+   else:
+    installCommand()
+  except Exception:
+   traceback.print_exc()
+
+ def doAfter(self, result):
+  self.ui.installButton.config(state=NORMAL)
+
+
+class FirmwareUpdateTask(BackgroundTask):
+ """Task to run firmwareUpdateCommand()"""
+ def doBefore(self):
+  self.ui.fwUpdateButton.config(state=DISABLED)
+  return self.ui.getSelectedDat()
+
+ def do(self, datFile):
+  try:
+   if datFile:
+    print('')
+    with open(datFile, 'rb') as f:
+     firmwareUpdateCommand(f)
+  except Exception:
+   traceback.print_exc()
+
+ def doAfter(self, result):
+  self.ui.fwUpdateButton.config(state=NORMAL)
+
+
+class StartPlatformShellTask(BackgroundTask):
+ def doBefore(self):
+  self.ui.startUpdaterShellButton.config(state=DISABLED)
+  self.ui.startSenserShellButton.config(state=DISABLED)
+
+ def do(self, arg):
+  try:
+   print('')
+   self.start()
+  except Exception:
+   traceback.print_exc()
+
+ def start(self):
+  pass
+
+ def launchShell(self, backend):
+  backend.start()
+  tweaks = TweakInterface(backend)
+
+  if next(tweaks.getTweaks(), None):
+   endFlag = threading.Event()
+   root = self.ui.master
+   root.run(lambda: root.after(0, lambda: TweakDialog(root, tweaks, endFlag)))
+   endFlag.wait()
+  else:
+   print('没有可用的设置项')
+
+  backend.stop()
+
+ def doAfter(self, result):
+  self.ui.startUpdaterShellButton.config(state=NORMAL)
+  self.ui.startSenserShellButton.config(state=NORMAL)
+
+
+class StartUpdaterShellTask(StartPlatformShellTask):
+ """Task to run updaterShellCommand() and open TweakDialog"""
+ def start(self):
+  updaterShellCommand(complete=lambda dev: self.launchShell(UsbPlatformBackend(dev)))
+
+
+class StartSenserShellTask(StartPlatformShellTask):
+ """Task to run senserShellCommand() and open TweakDialog"""
+ def start(self):
+  senserShellCommand(complete=lambda dev: self.launchShell(SenserPlatformBackend(dev)))
+
+
+class TweakApplyTask(BackgroundTask):
+ """Task to run TweakInterface.apply()"""
+ def doBefore(self):
+  self.ui.setState(DISABLED)
+
+ def do(self, arg):
+  try:
+   print('正在应用设置...')
+   self.ui.tweakInterface.apply()
+  except Exception:
+   traceback.print_exc()
+
+ def doAfter(self, result):
+  self.ui.setState(NORMAL)
+  self.ui.cancel()
+
+
+class MainUi(UiRoot):
+ """Main window"""
+ def __init__(self, title):
+  UiRoot.__init__(self)
+
+  self.title(title)
+  self.geometry('450x500')
+  self['menu'] = Menu(self)
+
+  tabs = Notebook(self, padding=5)
+  tabs.pack(fill=X)
+
+  tabs.add(InfoFrame(self, padding=10), text='相机信息')
+  tabs.add(InstallerFrame(self, padding=10), text='安装应用')
+  tabs.add(UpdaterShellFrame(self, padding=10), text='高级设置')
+  tabs.add(FirmwareFrame(self, padding=10), text='更新固件')
+
+  docsLink = Label(self, text='相机兼容性列表', foreground='blue', cursor='hand2')
+  docsLink.bind('<Button-1>', lambda e: webbrowser.open_new(config.docsUrl + '/devices.html'))
+  docsLink.pack(pady=(0, 5))
+
+  self.logText = ScrollingText(self)
+  self.logText.text.configure(state=DISABLED)
+  self.logText.pack(fill=BOTH, expand=True)
+
+  self.redirectStreams()
+
+ def log(self, msg):
+  self.logText.text.configure(state=NORMAL)
+  self.logText.text.insert(END, msg)
+  self.logText.text.configure(state=DISABLED)
+  self.logText.text.see(END)
+
+ def redirectStreams(self):
+  for stream in ['stdout', 'stderr']:
+   setattr(sys, stream, PrintRedirector(lambda str: self.run(lambda: self.log(str)), getattr(sys, stream)))
+
+
+class InfoFrame(UiFrame):
+ def __init__(self, parent, **kwargs):
+  UiFrame.__init__(self, parent, **kwargs)
+
+  self.infoButton = Button(self, text='获取相机信息', command=InfoTask(self).run, padding=5)
+  self.infoButton.pack(fill=X)
+
+
+class InstallerFrame(UiFrame):
+ MODE_APP = 0
+ MODE_APK = 1
+
+ def __init__(self, parent, **kwargs):
+  UiFrame.__init__(self, parent, **kwargs)
+
+  self.modeVar = IntVar(value=self.MODE_APP)
+
+  appFrame = Labelframe(self, padding=5)
+  appFrame['labelwidget'] = Radiobutton(appFrame, text='从应用列表中选择应用', variable=self.modeVar, value=self.MODE_APP)
+  appFrame.columnconfigure(0, weight=1)
+  appFrame.pack(fill=X)
+
+  self.appCombo = Combobox(appFrame, state='readonly')
+  self.appCombo.bind('<<ComboboxSelected>>', lambda e: self.modeVar.set(self.MODE_APP))
+  self.appCombo.grid(row=0, column=0, sticky=W+E)
+  self.setAppList([])
+
+  self.appLoadButton = Button(appFrame, text='刷新', command=AppLoadTask(self).run)
+  self.appLoadButton.grid(row=0, column=1)
+
+  appListLink = Label(appFrame, text='来源', foreground='blue', cursor='hand2')
+  appListLink.bind('<Button-1>', lambda e: webbrowser.open_new('https://github.com/' + config.githubAppListUser + '/' + config.githubAppListRepo))
+  appListLink.grid(columnspan=2, sticky=W)
+
+  apkFrame = Labelframe(self, padding=5)
+  apkFrame['labelwidget'] = Radiobutton(apkFrame, text='选择 APK 文件', variable=self.modeVar, value=self.MODE_APK)
+  apkFrame.columnconfigure(0, weight=1)
+  apkFrame.pack(fill=X)
+
+  self.apkFile = Entry(apkFrame)
+  self.apkFile.grid(row=0, column=0, sticky=W+E)
+
+  self.apkSelectButton = Button(apkFrame, text='打开 APK...', command=self.openApk)
+  self.apkSelectButton.grid(row=0, column=1)
+
+  self.installButton = Button(self, text='安装所选应用', command=InstallTask(self).run, padding=5)
+  self.installButton.pack(fill=X, pady=(5, 0))
+
+  self.run(AppLoadTask(self).run)
+
+ def getMode(self):
+  return self.modeVar.get()
+
+ def openApk(self):
+  fn = askopenfilename(filetypes=[('APK 文件', '.apk'), ('所有文件', '.*')])
+  if fn:
+   self.apkFile.delete(0, END)
+   self.apkFile.insert(0, fn)
+   self.modeVar.set(self.MODE_APK)
+
+ def getSelectedApk(self):
+  return self.apkFile.get()
+
+ def setAppList(self, apps):
+  self.appList = apps
+  self.appCombo['values'] = [''] + [app.name for app in apps]
+  self.appCombo.current(0)
+
+ def getSelectedApp(self):
+  if self.appCombo.current() > 0:
+   return self.appList[self.appCombo.current() - 1]
+
+
+class FirmwareFrame(UiFrame):
+ def __init__(self, parent, **kwargs):
+  UiFrame.__init__(self, parent, **kwargs)
+
+  datFrame = Labelframe(self, padding=5)
+  datFrame['labelwidget'] = Label(datFrame, text='固件文件')
+  datFrame.pack(fill=X)
+
+  self.datFile = Entry(datFrame)
+  self.datFile.pack(side=LEFT, fill=X, expand=True)
+
+  self.datSelectButton = Button(datFrame, text='打开...', command=self.openDat)
+  self.datSelectButton.pack()
+
+  self.fwUpdateButton = Button(self, text='更新固件', command=FirmwareUpdateTask(self).run, padding=5)
+  self.fwUpdateButton.pack(fill=X, pady=(5, 0))
+
+ def openDat(self):
+  fn = askopenfilename(filetypes=[('固件文件', '.dat'), ('所有文件', '.*')])
+  if fn:
+   self.datFile.delete(0, END)
+   self.datFile.insert(0, fn)
+
+ def getSelectedDat(self):
+  return self.datFile.get()
+
+
+class UpdaterShellFrame(UiFrame):
+ def __init__(self, parent, **kwargs):
+  UiFrame.__init__(self, parent, **kwargs)
+
+  self.startUpdaterShellButton = Button(self, text='开始调整（固件更新模式）', command=StartUpdaterShellTask(self).run, padding=5)
+  self.startUpdaterShellButton.pack(fill=X)
+
+  self.startSenserShellButton = Button(self, text='开始调整（服务模式）', command=StartSenserShellTask(self).run, padding=5)
+  self.startSenserShellButton.pack(fill=X, pady=(5, 0))
+
+
+class TweakDialog(UiDialog):
+ def __init__(self, parent, tweakInterface, endFlag=None):
+  self.tweakInterface = tweakInterface
+  self.endFlag = endFlag
+  UiDialog.__init__(self, parent, "高级设置")
+
+ def body(self, top):
+  tweakFrame = Labelframe(top, padding=5)
+  tweakFrame['labelwidget'] = Label(tweakFrame, text='高级设置')
+  tweakFrame.pack(fill=X)
+
+  self.boxFrame = Frame(tweakFrame)
+  self.boxFrame.pack(fill=BOTH, expand=True)
+
+  self.applyButton = Button(top, text='应用', command=TweakApplyTask(self).run, padding=5)
+  self.applyButton.pack(fill=X)
+
+  self.updateStatus()
+
+ def updateStatus(self):
+  for child in self.boxFrame.winfo_children():
+   child.destroy()
+  for id, desc, status, value in self.tweakInterface.getTweaks():
+   var = IntVar(value=status)
+   c = Checkbutton(self.boxFrame, text=desc + '\n' + value, variable=var, command=lambda id=id, var=var: self.setTweak(id, var.get()))
+   c.pack(fill=X)
+
+ def setTweak(self, id, enabled):
+  self.tweakInterface.setEnabled(id, enabled)
+  self.updateStatus()
+
+ def setState(self, state):
+  for widget in self.boxFrame.winfo_children() + [self.applyButton]:
+   widget.config(state=state)
+
+ def cancel(self, event=None):
+  UiDialog.cancel(self, event)
+  if self.endFlag:
+   self.endFlag.set()
+
+
+def main():
+ """Gui main"""
+ ui = MainUi('OpenMemories: pmca-gui' + (' ' + version if version else ''))
+ ui.mainloop()
+
+
+if __name__ == '__main__':
+ main()

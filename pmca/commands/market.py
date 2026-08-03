@@ -1,0 +1,37 @@
+import os
+import re
+
+from .. import marketclient
+from .. import spk
+
+def marketCommand(token):
+ devices = marketclient.getDevices(token)
+ print('找到 %d 台设备\n' % len(devices))
+
+ apps = []
+ for device in devices:
+  print('%s (%s)' % (device.name, device.serial))
+  for app in marketclient.getApps(device.name):
+   if not app.price:
+    apps.append((device.deviceid, app.id))
+    print(' [%2d] %s' % (len(apps), app.name))
+  print('')
+
+ if apps:
+  while True:
+   i = int(input('输入要下载的应用编号（0 表示退出）：'))
+   if i == 0:
+    break
+   app = apps[i - 1]
+   print('正在下载应用 %s' % app[1])
+   spkName, spkData = marketclient.download(token, app[0], app[1])
+   fn = re.sub('(%s)?$' % re.escape(spk.constants.extension), '.apk', spkName)
+   data = spk.parse(spkData)
+
+   if os.path.exists(fn):
+    print('文件 %s 已存在' % fn)
+   else:
+    with open(fn, 'wb') as f:
+     f.write(data)
+    print('应用已写入 %s' % fn)
+   print('')

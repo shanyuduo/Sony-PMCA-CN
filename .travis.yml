@@ -1,0 +1,45 @@
+# Run os x builds on travis-ci.org
+
+# Use OS X 10.10
+os: osx
+language: generic
+osx_image: xcode6.4
+
+env:
+ - HOMEBREW_NO_AUTO_UPDATE=1
+
+git:
+ submodules: false
+
+before_install:
+ # Install Python 3.6.2
+ - brew install https://raw.github.com/Homebrew/homebrew-core/b1f976bb3c76bbb2a8d76cf46fea8b2c2235f631/Formula/python3.rb
+ - python3 -m venv venv
+ - source venv/bin/activate
+
+ # Install libusb 1.0.21
+ - brew install https://raw.github.com/Homebrew/homebrew-core/cb21e9ac30e47e3ea161c4247a6397967f83c83f/Formula/libusb.rb
+
+install:
+ # Install dependencies
+ - python -m pip install --upgrade pip
+ - pip install setuptools wheel --upgrade
+ - pip install -r requirements.txt
+
+ # Log versions
+ - python --version
+ - pip list --format=columns
+
+script:
+ # Run pyinstaller
+ - python -OO -m PyInstaller pmca-console.spec
+ - python -OO -m PyInstaller pmca-gui.spec
+
+deploy:
+ # Deploy tagged releases
+ provider: releases
+ api_key: {secure: PWMg2dhPJgK4mww9yJcz3myo6oZwSMZU+2MvwDnvMvdZTaUPexHeiszX7RwBpzLNgPB+uJ7dgnjYJLm+LhgVgmeOhioIw9GDzVaC0rwfVVp94Q1tTHoXNlaDAfXQobY5p5avdjA2lSpvTuMDeiuAz2synsU5xmEcVbnhMtoMi8bsm4Nly63519yNkjyaYQU6BKR1lpHy9fh952YFcL2f4vRMYeq2aB3YLBCP1n9AkuocNEXoP+U03Ol+NpMWYcwBJGDunDo7dXkXSlBN5H4Re8JhAcKxfbuvnlkgb+bm+0OyOl0ePHPLOvShxeQlnI6A8NdmBBHLPBE2IIJw4pkhiU5wXvt70/teJLzww/90jNUNw+O7Z4e+HdBCLGENv4c9TnDnqU1RJKmcnWxWIbUNuCAzIsT5NGY7/lrOvlNJTVJ8O/dfmE/mRcGTJsXZyGEviysiLax56mRK4K07l0d5g6giPk0DadIBkANoBKzp4NDeB1E8VC7p0tAJZ1MaYHK8qEGelgtEFxnQm3NVnMv8tLZZEKLPCwgTJZTnyX+oJ/UxfHqO23hw+ntpRL9+dlLQouKnck+FEmGwYUUmIRfzGA21jpBprahEXENtn0efSd0fbYG0PvkrQRA/C4QuLOTkYgWJHWO+9dOww21rJ7YY4sp5yRMeXaBYj1zglUxyecY=}
+ file_glob: true
+ file: dist/*
+ skip_cleanup: true
+ on: {tags: true}
