@@ -46,7 +46,7 @@ pip install -r requirements.txt  # 安装依赖
 
 ### 应用安装器
 
-如果相机支持 *PlayMemories Camera Apps (PMCA)*，可通过本工具安装自定义 Android 应用。支持的相机列表请参见[这里](https://openmemories.readthedocs.io/devices.html)。
+如果相机支持 *PlayMemories Camera Apps (PMCA)*，可通过本工具安装自定义 Android 应用。支持的相机列表请参见[兼容设备列表](docs/devices.md)。
 
 推荐安装 [*OpenMemories: Tweak*](https://github.com/ma1co/OpenMemories-Tweak) 应用。该应用允许调整相机设置，并启动 *telnet* 和 *adb* 服务以在系统上执行代码。
 
@@ -62,7 +62,7 @@ pip install -r requirements.txt  # 安装依赖
 
 此模式无需特殊驱动，系统自带的海量存储 USB 驱动即可。
 
-支持的相机型号列表请参见[这里](https://openmemories.readthedocs.io/devices.html)。基于 CXD90045 和 CXD90057 架构的设备不兼容，因为其固件经过加密签名。
+支持的相机型号列表请参见[兼容设备列表](docs/devices.md)。基于 CXD90045 和 CXD90057 架构的设备不兼容，因为其固件经过加密签名。
 
 使用方式有两种：
 - **图形界面**：在「高级设置」标签页中，点击「开始调整（固件更新模式）」，然后使用复选框配置相机设置。
